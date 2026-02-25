@@ -1,4 +1,5 @@
 import { action } from './_generated/server'
+import type { ActionCtx } from './_generated/server'
 import { api } from './_generated/api'
 import type { Id } from './_generated/dataModel'
 import { v } from 'convex/values'
@@ -14,7 +15,7 @@ type SyncSummary = {
 }
 
 async function runTransactionsSyncForItem(
-  ctx: any,
+  ctx: ActionCtx,
   itemId: Id<'items'>,
 ): Promise<SyncSummary> {
   const item: {
