@@ -1,4 +1,5 @@
 import { mutation, query } from './_generated/server'
+import type { Id } from './_generated/dataModel'
 import { v } from 'convex/values'
 
 export const getItemByPlaidItemId = query({
@@ -234,7 +235,7 @@ export const applyTransactionsSyncPage = mutation({
   handler: async (ctx, args) => {
     const now = Date.now()
 
-    const accountByPlaidId = new Map<string, string>()
+    const accountByPlaidId = new Map<string, Id<'accounts'>>()
     const accounts = await ctx.db
       .query('accounts')
       .withIndex('by_item_id', (q) => q.eq('itemId', args.itemId))
@@ -259,7 +260,7 @@ export const applyTransactionsSyncPage = mutation({
 
       const payload = {
         userId: args.userId,
-        accountId,
+        accountId: accountId as Id<'accounts'>,
         plaidTransactionId: row.transactionId,
         pendingTransactionId: row.pendingTransactionId,
         amountCents: row.amountCents,
