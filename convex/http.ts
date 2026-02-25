@@ -1,7 +1,6 @@
 import { httpRouter } from "convex/server";
 import { api } from "./_generated/api";
 import { httpAction } from "./_generated/server";
-import { verifyPlaidWebhookSignature } from "./plaidWebhookVerify";
 
 const http = httpRouter();
 
@@ -10,14 +9,21 @@ http.route({
 	method: "POST",
 	handler: httpAction(async (ctx, request) => {
 		const body = await request.text();
+		const idempotencyKey =
+			request.headers.get("plaid-webhook-id") ??
+			request.headers.get("x-request-id") ??
+			`${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-		try {
-			await verifyPlaidWebhookSignature(
+		const result = await ctx.runAction(
+			api.webhooksNode.verifyAndProcessPlaidWebhook,
+			{
 				body,
-				request.headers.get("Plaid-Verification"),
-			);
-		} catch (error) {
-			console.warn("Rejected Plaid webhook signature", error);
+				idempotencyKey,
+				plaidVerificationHeader: request.headers.get("Plaid-Verification") ?? undefined,
+			},
+		);
+
+		if (result.status === "unauthorized") {
 			return new Response(
 				JSON.stringify({ ok: false, error: "unauthorized" }),
 				{
@@ -26,16 +32,6 @@ http.route({
 				},
 			);
 		}
-
-		const idempotencyKey =
-			request.headers.get("plaid-webhook-id") ??
-			request.headers.get("x-request-id") ??
-			`${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-		await ctx.runAction(api.webhooks.processPlaidWebhook, {
-			body,
-			idempotencyKey,
-		});
 
 		return new Response(JSON.stringify({ ok: true }), {
 			status: 200,

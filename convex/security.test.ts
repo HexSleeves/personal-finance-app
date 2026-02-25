@@ -1,3 +1,5 @@
+"use node";
+
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	decryptToken,
@@ -26,8 +28,17 @@ describe("security token encryption", () => {
 	it("detects tampered ciphertext", () => {
 		const token = "access-sandbox-token";
 		const encrypted = encryptToken(token);
-		const tampered = `${encrypted.slice(0, -1)}${encrypted.endsWith("A") ? "B" : "A"}`;
 
+		const [prefix, payload] = encrypted.split(":");
+		expect(prefix).toBe("v2");
+		expect(payload).toBeTruthy();
+
+		const parts = payload!.split(".");
+		const ciphertextBytes = Buffer.from(parts[1], "base64url");
+		ciphertextBytes[0] = ciphertextBytes[0] ^ 0b00000001;
+		parts[1] = ciphertextBytes.toString("base64url");
+
+		const tampered = `${prefix}:${parts.join(".")}`;
 		expect(() => decryptToken(tampered)).toThrow();
 	});
 

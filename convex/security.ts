@@ -1,3 +1,5 @@
+"use node";
+
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 const LEGACY_TOKEN_PREFIX = "v1:";

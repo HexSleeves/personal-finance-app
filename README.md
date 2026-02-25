@@ -80,8 +80,6 @@ Implemented:
 
 Still required before production use:
 
-- Replace placeholder token encryption in `convex/security.ts` with strong authenticated encryption.
-- Verify Plaid webhook signatures.
 - Add authenticated user context (Clerk integration) and remove direct `userId` input from client calls.
 - Add retry/backoff queueing for failed sync attempts.
 

@@ -1,3 +1,5 @@
+"use node";
+
 import { v } from "convex/values";
 import { CountryCode, Products } from "plaid";
 import { api } from "./_generated/api";
