@@ -2,10 +2,11 @@
 
 import { v } from "convex/values";
 import { CountryCode, Products } from "plaid";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
 import { action } from "./_generated/server";
+import { requireUser } from "./auth";
 import { getPlaidClient } from "./plaidClient";
 import { decryptTokenWithMetadata, encryptToken } from "./security";
 import {
@@ -183,14 +184,12 @@ async function runTransactionsSyncForItem(
 }
 
 export const createLinkToken = action({
-	args: {
-		userId: v.id("users"),
-		userClientId: v.string(),
-	},
-	handler: async (_ctx, args) => {
+	args: {},
+	handler: async (ctx) => {
+		const user = await requireUser(ctx);
 		const plaid = getPlaidClient();
 		const response = await plaid.linkTokenCreate({
-			user: { client_user_id: args.userClientId },
+			user: { client_user_id: user.clerkId },
 			client_name: "Northstar Finance",
 			products: [Products.Transactions],
 			country_codes: [CountryCode.Us],
@@ -209,10 +208,10 @@ export const createLinkToken = action({
 
 export const exchangePublicTokenAndSync = action({
 	args: {
-		userId: v.id("users"),
 		publicToken: v.string(),
 	},
 	handler: async (ctx, args) => {
+		const user = await requireUser(ctx);
 		const plaid = getPlaidClient();
 
 		const exchange = await plaid.itemPublicTokenExchange({
@@ -237,7 +236,7 @@ export const exchangePublicTokenAndSync = action({
 		const itemDocId: Id<"items"> = await ctx.runMutation(
 			api.plaidPersistence.upsertItemWithInstitution,
 			{
-				userId: args.userId,
+				userId: user._id,
 				plaidItemId,
 				plaidInstitutionId: institutionId,
 				institutionName: institution.data.institution.name,
@@ -248,7 +247,7 @@ export const exchangePublicTokenAndSync = action({
 
 		const accounts = await plaid.accountsGet({ access_token: accessToken });
 		await ctx.runMutation(api.plaidPersistence.upsertAccounts, {
-			userId: args.userId,
+			userId: user._id,
 			itemId: itemDocId,
 			accounts: accounts.data.accounts.map((account) => ({
 				plaidAccountId: account.account_id,
@@ -293,8 +292,9 @@ export const retryDueItemSyncs = action({
 			errorMessage?: string;
 		}>;
 	}> => {
+		const user = await requireUser(ctx);
 		const dueItems: Array<{ _id: Id<"items"> }> = await ctx.runQuery(
-			api.plaidPersistence.listRetryableItemsDue,
+			internal.plaidPersistence.listRetryableItemsDue,
 			{
 				now: Date.now(),
 			},
@@ -307,6 +307,13 @@ export const retryDueItemSyncs = action({
 		}> = [];
 
 		for (const item of dueItems) {
+			const itemDoc = await ctx.runQuery(api.plaidPersistence.getItemForSync, {
+				itemId: item._id,
+			});
+			if (!itemDoc || itemDoc.userId !== user._id) {
+				continue;
+			}
+
 			try {
 				await runTransactionsSyncForItem(ctx, item._id);
 				results.push({ itemId: item._id, status: "success" });
@@ -326,5 +333,29 @@ export const retryDueItemSyncs = action({
 				.length,
 			results,
 		};
+	},
+});
+
+export const listMyConnectionHealth = action({
+	args: {},
+	handler: async (
+		ctx,
+	): Promise<
+		Array<{
+			_id: Id<"items">;
+			plaidItemId: string;
+			status: "healthy" | "degraded" | "needs_reauth" | "disconnected";
+			errorCode?: string;
+			errorMessage?: string;
+			lastWebhookAt?: number;
+			updatedAt: number;
+			nextRetryAt?: number;
+			institutionName: string;
+		}>
+	> => {
+		const user = await requireUser(ctx);
+		return await ctx.runQuery(internal.plaidPersistence.listItemsByUser, {
+			userId: user._id,
+		});
 	},
 });

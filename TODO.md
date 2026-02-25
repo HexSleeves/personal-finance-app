@@ -81,26 +81,47 @@ This is the execution tasklist for the next agent. Follow in order unless blocke
 
 ### 4) Integrate Clerk with Convex auth context
 
+**Status**: 🚧 In progress
+
 **Files**: frontend auth wiring, Convex auth config, `convex/users.ts`, call sites
 
-- [ ] Add Clerk provider and session handling to app shell.
-- [ ] Configure Convex auth integration.
-- [ ] Implement `requireUser(ctx)` helper to resolve current app user record.
-- [ ] Remove client-supplied `userId` from public actions/mutations.
-- [ ] Update Plaid actions to derive user from auth identity.
+- [x] Add Clerk provider and session handling to app shell.
+- [x] Configure Convex auth integration.
+- [x] Implement `requireUser(ctx)` helper to resolve current app user record.
+- [x] Remove client-supplied `userId` from public actions/mutations.
+- [x] Update Plaid actions to derive user from auth identity.
+
+**Implemented**:
+
+- [x] Added Convex auth helper module `convex/auth.ts`:
+  - `requireIdentity(ctx)` for authenticated identity extraction.
+  - `requireUser(ctx)` for resolving current app user row.
+- [x] Added Convex auth provider config in `convex/auth.config.ts` (Clerk domain + `convex` audience).
+- [x] Refactored user functions in `convex/users.ts`:
+  - `bootstrapCurrentUser` mutation (auth-derived user, idempotent).
+  - `getCurrentUser` query.
+  - `getUserByClerkIdInternal` internal query for action-side lookup.
+- [x] Refactored Plaid actions in `convex/plaid.ts`:
+  - Removed client-supplied `userId` inputs from public actions.
+  - `createLinkToken` and `exchangePublicTokenAndSync` now use `requireUser(ctx)`.
+  - Retry/catch-up paths now enforce current user ownership checks.
+- [x] Added frontend provider wiring in `src/lib/providers.tsx`:
+  - `ClerkProvider` + `ConvexProviderWithClerk`.
+  - App-init bootstrap call to `api.users.bootstrapCurrentUser` after sign-in.
+- [x] Wrapped app shell with providers in `src/routes/__root.tsx`.
 
 **Acceptance**:
 
-- All finance mutations/actions use authenticated context user.
+- [x] All finance mutations/actions use authenticated context user.
 
 ### 5) Initial user bootstrap flow
 
-- [ ] On first sign-in, create user row with defaults (timezone/currency).
-- [ ] Add safe idempotent bootstrap call from app init.
+- [x] On first sign-in, create user row with defaults (timezone/currency).
+- [x] Add safe idempotent bootstrap call from app init.
 
 **Acceptance**:
 
-- New login creates user once; repeat logins do not duplicate.
+- [x] New login creates user once; repeat logins do not duplicate.
 
 ---
 
@@ -122,9 +143,17 @@ This is the execution tasklist for the next agent. Follow in order unless blocke
 
 ### 7) Connection health UI
 
-- [ ] Display institutions/items with status (healthy/degraded/needs_reauth/disconnected).
+**Status**: 🚧 Started
+
+- [x] Display institutions/items with status (healthy/degraded/needs_reauth/disconnected). *(backend action scaffolded)*
 - [ ] Show last successful sync time.
 - [ ] Add manual “Sync now” action.
+
+**Implemented so far**:
+
+- [x] Added `listMyConnectionHealth` action in `convex/plaid.ts`.
+- [x] Added `listItemsByUser` internal query in `convex/plaidPersistence.ts`.
+- [x] Added basic Settings page Convex call path (`src/routes/settings.tsx`) to validate end-to-end auth + Convex invocation.
 
 **Acceptance**:
 

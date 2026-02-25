@@ -62,15 +62,17 @@ That command provisions/links a deployment, writes env values, and generates `co
 3. Add generated deployment variables to your local env.
 4. Keep `bun run convex:dev` running while implementing backend functions.
 
-## Planned Environment Variables
+## Environment Variables
 
 - `VITE_CONVEX_URL`
 - `PLAID_CLIENT_ID`
 - `PLAID_SECRET`
 - `PLAID_ENV` (`sandbox` | `development` | `production`)
 - `PLAID_WEBHOOK_SECRET`
-- `CLERK_PUBLISHABLE_KEY`
+- `VITE_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
+- `CLERK_JWT_ISSUER_DOMAIN` (for Convex `auth.config.ts`)
+- `CLERK_JWT_AUDIENCE` (optional, default `convex`)
 - `RESEND_API_KEY`
 
 ## Notes
@@ -92,8 +94,8 @@ Implemented:
 
 Still required before production use:
 
-- Add authenticated user context (Clerk integration) and remove direct `userId` input from client calls.
-- Add retry/backoff queueing for failed sync attempts.
+- Finalize Clerk login UI/sign-in flow wiring in app routes.
+- Add retry/backoff dead-letter/ops tooling for repeated sync failures.
 
 ### Plaid Webhook URL
 

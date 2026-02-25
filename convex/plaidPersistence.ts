@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 
 export const getItemByPlaidItemId = query({
 	args: { plaidItemId: v.string() },
@@ -405,7 +405,7 @@ export const getItemRetryState = query({
 	},
 });
 
-export const listRetryableItemsDue = query({
+export const listRetryableItemsDue = internalQuery({
 	args: { now: v.number() },
 	handler: async (ctx, args) => {
 		const degradedItems = await ctx.db
@@ -418,5 +418,44 @@ export const listRetryableItemsDue = query({
 				(item) => (item.nextRetryAt ?? Number.MAX_SAFE_INTEGER) <= args.now,
 			)
 			.map((item) => ({ _id: item._id }));
+	},
+});
+
+export const listItemsByUser = internalQuery({
+	args: { userId: v.id("users") },
+	handler: async (ctx, args) => {
+		const items = await ctx.db
+			.query("items")
+			.withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+			.collect();
+
+		const result: Array<{
+			_id: Id<"items">;
+			plaidItemId: string;
+			status: "healthy" | "degraded" | "needs_reauth" | "disconnected";
+			errorCode?: string;
+			errorMessage?: string;
+			lastWebhookAt?: number;
+			updatedAt: number;
+			nextRetryAt?: number;
+			institutionName: string;
+		}> = [];
+
+		for (const item of items) {
+			const institution = await ctx.db.get(item.institutionId);
+			result.push({
+				_id: item._id,
+				plaidItemId: item.plaidItemId,
+				status: item.status,
+				errorCode: item.errorCode,
+				errorMessage: item.errorMessage,
+				lastWebhookAt: item.lastWebhookAt,
+				updatedAt: item.updatedAt,
+				nextRetryAt: item.nextRetryAt,
+				institutionName: institution?.name ?? "Unknown institution",
+			});
+		}
+
+		return result;
 	},
 });

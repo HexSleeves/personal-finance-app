@@ -19,6 +19,7 @@
 	},
 	"packageManager": "bun@1.2.23",
 	"dependencies": {
+		"@clerk/clerk-react": "^5.28.4",
 		"@tailwindcss/vite": "^4.1.18",
 		"@tanstack/react-devtools": "^0.9.6",
 		"@tanstack/react-router": "^1.132.0",
