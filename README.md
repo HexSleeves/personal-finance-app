@@ -21,19 +21,31 @@ See [PLAN.md](./PLAN.md) for scope and milestones.
 ## Local Development
 
 ```bash
-npm install
+bun install
 cp .env.example .env.local
-npm run dev
+bun run dev
 ```
 
 App runs at `http://localhost:3000`.
+
+### Quality scripts (Biome + TypeScript)
+
+```bash
+bun run lint
+bun run format
+bun run format:check
+bun run check
+bun run typecheck
+```
+
+Biome ignores generated Convex code and dependencies (`convex/_generated`, `node_modules`).
 
 ## Required one-time step for Convex codegen
 
 Before TypeScript checks for Convex functions will pass, initialize Convex:
 
 ```bash
-npx convex dev
+bun run convex:dev
 ```
 
 That command provisions/links a deployment, writes env values, and generates `convex/_generated/*`.
@@ -43,12 +55,12 @@ That command provisions/links a deployment, writes env values, and generates `co
 1. Create a Convex project:
 
    ```bash
-   npx convex dev
+   bun run convex:dev
    ```
 
 2. Follow the interactive prompts to authenticate and provision the project.
 3. Add generated deployment variables to your local env.
-4. Keep `npx convex dev` running while implementing backend functions.
+4. Keep `bun run convex:dev` running while implementing backend functions.
 
 ## Planned Environment Variables
 

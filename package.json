@@ -9,8 +9,15 @@
 		"dev": "vite dev --port 3000",
 		"build": "vite build",
 		"preview": "vite preview",
-		"test": "vitest run"
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"check": "biome check .",
+		"convex:dev": "convex dev"
 	},
+	"packageManager": "bun@1.2.23",
 	"dependencies": {
 		"@tailwindcss/vite": "^4.1.18",
 		"@tanstack/react-devtools": "^0.9.6",
@@ -27,6 +34,7 @@
 		"tailwindcss": "^4.1.18"
 	},
 	"devDependencies": {
+		"@biomejs/biome": "^2.2.4",
 		"@tanstack/devtools-vite": "^0.5.1",
 		"@testing-library/dom": "^10.4.0",
 		"@testing-library/react": "^16.2.0",
