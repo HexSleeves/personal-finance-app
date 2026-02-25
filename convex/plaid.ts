@@ -13,13 +13,8 @@ type SyncSummary = {
   cursor: string | undefined
 }
 
-type SyncActionContext = {
-  runQuery: (ref: unknown, args: unknown) => Promise<any>
-  runMutation: (ref: unknown, args: unknown) => Promise<any>
-}
-
 async function runTransactionsSyncForItem(
-  ctx: SyncActionContext,
+  ctx: any,
   itemId: Id<'items'>,
 ): Promise<SyncSummary> {
   const item: {
