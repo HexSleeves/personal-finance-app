@@ -177,7 +177,16 @@ export const finalizeSyncRun = mutation({
 		modifiedCount: v.number(),
 		removedCount: v.number(),
 		status: v.union(v.literal("success"), v.literal("failed")),
+		errorCode: v.optional(v.string()),
+		errorType: v.optional(v.string()),
 		errorMessage: v.optional(v.string()),
+		retryable: v.optional(v.boolean()),
+		retryScheduledAt: v.optional(v.number()),
+		itemStatus: v.optional(
+			v.union(v.literal("degraded"), v.literal("needs_reauth")),
+		),
+		nextRetryAt: v.optional(v.number()),
+		failureCount: v.optional(v.number()),
 	},
 	handler: async (ctx, args) => {
 		const now = Date.now();
@@ -188,7 +197,11 @@ export const finalizeSyncRun = mutation({
 			addedCount: args.addedCount,
 			modifiedCount: args.modifiedCount,
 			removedCount: args.removedCount,
+			errorCode: args.errorCode,
+			errorType: args.errorType,
 			errorMessage: args.errorMessage,
+			retryable: args.retryable,
+			retryScheduledAt: args.retryScheduledAt,
 		});
 
 		if (args.status === "success") {
@@ -196,9 +209,22 @@ export const finalizeSyncRun = mutation({
 				cursor: args.cursorAfter,
 				status: "healthy",
 				errorCode: undefined,
+				errorMessage: undefined,
+				failureCount: 0,
+				nextRetryAt: undefined,
 				updatedAt: now,
 			});
+			return;
 		}
+
+		await ctx.db.patch(args.itemId, {
+			status: args.itemStatus ?? "degraded",
+			errorCode: args.errorCode,
+			errorMessage: args.errorMessage,
+			failureCount: args.failureCount,
+			nextRetryAt: args.nextRetryAt,
+			updatedAt: now,
+		});
 	},
 });
 
@@ -363,5 +389,34 @@ export const rotateItemAccessTokenCiphertext = mutation({
 			encryptedAccessToken: args.encryptedAccessToken,
 			updatedAt: Date.now(),
 		});
+	},
+});
+
+export const getItemRetryState = query({
+	args: { itemId: v.id("items") },
+	handler: async (ctx, args) => {
+		const item = await ctx.db.get(args.itemId);
+		if (!item) return null;
+		return {
+			failureCount: item.failureCount ?? 0,
+			nextRetryAt: item.nextRetryAt,
+			status: item.status,
+		};
+	},
+});
+
+export const listRetryableItemsDue = query({
+	args: { now: v.number() },
+	handler: async (ctx, args) => {
+		const degradedItems = await ctx.db
+			.query("items")
+			.withIndex("by_status", (q) => q.eq("status", "degraded"))
+			.collect();
+
+		return degradedItems
+			.filter(
+				(item) => (item.nextRetryAt ?? Number.MAX_SAFE_INTEGER) <= args.now,
+			)
+			.map((item) => ({ _id: item._id }));
 	},
 });

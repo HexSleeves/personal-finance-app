@@ -8,6 +8,11 @@ import type { ActionCtx } from "./_generated/server";
 import { action } from "./_generated/server";
 import { getPlaidClient } from "./plaidClient";
 import { decryptTokenWithMetadata, encryptToken } from "./security";
+import {
+	calculateRetryDelayMs,
+	classifySyncError,
+	MAX_SYNC_RETRIES,
+} from "./syncRetry";
 
 type SyncSummary = {
 	addedCount: number;
@@ -129,6 +134,32 @@ async function runTransactionsSyncForItem(
 
 		return { addedCount, modifiedCount, removedCount, cursor };
 	} catch (error) {
+		const retryState = await ctx.runQuery(
+			api.plaidPersistence.getItemRetryState,
+			{
+				itemId: item._id,
+			},
+		);
+		const classification = classifySyncError(error);
+		const failureCount = (retryState?.failureCount ?? 0) + 1;
+		const retriesExhausted = failureCount >= MAX_SYNC_RETRIES;
+		const shouldRetry = classification.isRetryable && !retriesExhausted;
+		const retryDelayMs = shouldRetry
+			? calculateRetryDelayMs(failureCount)
+			: undefined;
+		const retryScheduledAt =
+			typeof retryDelayMs === "number" ? Date.now() + retryDelayMs : undefined;
+
+		if (typeof retryDelayMs === "number") {
+			await ctx.scheduler.runAfter(
+				retryDelayMs,
+				api.plaid.runTransactionsSync,
+				{
+					itemId: item._id,
+				},
+			);
+		}
+
 		await ctx.runMutation(api.plaidPersistence.finalizeSyncRun, {
 			syncRunId,
 			itemId: item._id,
@@ -137,8 +168,14 @@ async function runTransactionsSyncForItem(
 			addedCount,
 			modifiedCount,
 			removedCount,
-			errorMessage:
-				error instanceof Error ? error.message : "Unknown sync error",
+			errorCode: classification.errorCode,
+			errorType: classification.errorType,
+			errorMessage: classification.errorMessage,
+			retryable: classification.isRetryable,
+			retryScheduledAt,
+			itemStatus: retriesExhausted ? "needs_reauth" : classification.itemStatus,
+			nextRetryAt: retryScheduledAt,
+			failureCount,
 		});
 
 		throw error;
@@ -240,5 +277,54 @@ export const runTransactionsSync = action({
 	args: { itemId: v.id("items") },
 	handler: async (ctx, args): Promise<SyncSummary> => {
 		return await runTransactionsSyncForItem(ctx, args.itemId);
+	},
+});
+
+export const retryDueItemSyncs = action({
+	args: {},
+	handler: async (
+		ctx,
+	): Promise<{
+		triedCount: number;
+		successCount: number;
+		results: Array<{
+			itemId: Id<"items">;
+			status: "success" | "failed";
+			errorMessage?: string;
+		}>;
+	}> => {
+		const dueItems: Array<{ _id: Id<"items"> }> = await ctx.runQuery(
+			api.plaidPersistence.listRetryableItemsDue,
+			{
+				now: Date.now(),
+			},
+		);
+
+		const results: Array<{
+			itemId: Id<"items">;
+			status: "success" | "failed";
+			errorMessage?: string;
+		}> = [];
+
+		for (const item of dueItems) {
+			try {
+				await runTransactionsSyncForItem(ctx, item._id);
+				results.push({ itemId: item._id, status: "success" });
+			} catch (error) {
+				results.push({
+					itemId: item._id,
+					status: "failed",
+					errorMessage:
+						error instanceof Error ? error.message : "Unknown sync retry error",
+				});
+			}
+		}
+
+		return {
+			triedCount: dueItems.length,
+			successCount: results.filter((result) => result.status === "success")
+				.length,
+			results,
+		};
 	},
 });

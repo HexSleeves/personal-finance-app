@@ -44,16 +44,36 @@ This is the execution tasklist for the next agent. Follow in order unless blocke
 
 ### 3) Add resilient retry strategy for sync failures
 
+**Status**: 🚧 In progress
+
 **Files**: `convex/plaid.ts`, `convex/webhooks.ts`, maybe new queue table in schema
 
-- [ ] Add retry metadata for failed sync runs.
-- [ ] Exponential backoff for transient failures.
-- [ ] Cap max retries; mark item as degraded/needs_reauth when appropriate.
-- [ ] Store actionable error code/message for UI.
+- [x] Add retry metadata for failed sync runs.
+- [x] Exponential backoff for transient failures.
+- [x] Cap max retries; mark item as degraded/needs_reauth when appropriate.
+- [x] Store actionable error code/message for UI.
+
+**Implemented**:
+
+- [x] Added sync error classifier and retry policy helper in `convex/syncRetry.ts`.
+- [x] Extended schema for retry observability:
+  - `items`: `errorMessage`, `failureCount`, `nextRetryAt`
+  - `syncRuns`: `errorCode`, `errorType`, `retryable`, `retryScheduledAt`
+- [x] Updated `finalizeSyncRun` mutation to persist failure metadata and item health transitions.
+- [x] On sync failure, `convex/plaid.ts` now:
+  - classifies Plaid/API errors,
+  - computes exponential backoff,
+  - persists retry schedule and failure counters,
+  - marks exhausted retries as `needs_reauth`.
+- [x] Added automatic retry scheduling via `ctx.scheduler.runAfter(...)` for retryable failures.
+- [x] Added helper queries for retry state and due retry visibility:
+  - `getItemRetryState`
+  - `listRetryableItemsDue`
+- [x] Added manual catch-up action `retryDueItemSyncs` for operational fallback.
 
 **Acceptance**:
 
-- Failed syncs are retried automatically and observable.
+- [x] Failed syncs are retried automatically and observable.
 
 ---
 

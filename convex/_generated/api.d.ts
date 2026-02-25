@@ -14,6 +14,7 @@ import type * as plaidClient from "../plaidClient.js";
 import type * as plaidPersistence from "../plaidPersistence.js";
 import type * as plaidWebhookVerify from "../plaidWebhookVerify.js";
 import type * as security from "../security.js";
+import type * as syncRetry from "../syncRetry.js";
 import type * as users from "../users.js";
 import type * as webhooks from "../webhooks.js";
 import type * as webhooksNode from "../webhooksNode.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   plaidPersistence: typeof plaidPersistence;
   plaidWebhookVerify: typeof plaidWebhookVerify;
   security: typeof security;
+  syncRetry: typeof syncRetry;
   users: typeof users;
   webhooks: typeof webhooks;
   webhooksNode: typeof webhooksNode;

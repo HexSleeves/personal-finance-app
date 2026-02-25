@@ -29,12 +29,16 @@ export default defineSchema({
 		),
 		cursor: v.optional(v.string()),
 		errorCode: v.optional(v.string()),
+		errorMessage: v.optional(v.string()),
+		failureCount: v.optional(v.number()),
+		nextRetryAt: v.optional(v.number()),
 		lastWebhookAt: v.optional(v.number()),
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	})
 		.index("by_user_id", ["userId"])
-		.index("by_plaid_item_id", ["plaidItemId"]),
+		.index("by_plaid_item_id", ["plaidItemId"])
+		.index("by_status", ["status"]),
 
 	accounts: defineTable({
 		userId: v.id("users"),
@@ -225,7 +229,11 @@ export default defineSchema({
 		addedCount: v.number(),
 		modifiedCount: v.number(),
 		removedCount: v.number(),
+		errorCode: v.optional(v.string()),
+		errorType: v.optional(v.string()),
 		errorMessage: v.optional(v.string()),
+		retryable: v.optional(v.boolean()),
+		retryScheduledAt: v.optional(v.number()),
 	})
 		.index("by_item_id", ["itemId"])
 		.index("by_user_id", ["userId"]),

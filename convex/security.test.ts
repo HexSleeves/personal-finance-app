@@ -31,9 +31,11 @@ describe("security token encryption", () => {
 
 		const [prefix, payload] = encrypted.split(":");
 		expect(prefix).toBe("v2");
-		expect(payload).toBeTruthy();
+		if (!payload) {
+			throw new Error("Expected encrypted payload segment");
+		}
 
-		const parts = payload!.split(".");
+		const parts = payload.split(".");
 		const ciphertextBytes = Buffer.from(parts[1], "base64url");
 		ciphertextBytes[0] = ciphertextBytes[0] ^ 0b00000001;
 		parts[1] = ciphertextBytes.toString("base64url");
