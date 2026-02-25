@@ -5,6 +5,8 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useAppAuth } from "../lib/providers";
 
+const isDev = import.meta.env.DEV;
+
 type ConnectionHealth = {
 	_id: Id<"items">;
 	plaidItemId: string;
@@ -123,6 +125,9 @@ function SettingsPage() {
 	);
 	const listMyConnectionHealth = useAction(api.plaid.listMyConnectionHealth);
 	const runTransactionsSync = useAction(api.plaid.runTransactionsSync);
+	const getEnvironmentDiagnostics = useAction(
+		api.plaid.getEnvironmentDiagnostics,
+	);
 
 	const [items, setItems] = useState<Array<ConnectionHealth>>([]);
 	const [isLoadingHealth, setIsLoadingHealth] = useState(false);
@@ -130,6 +135,9 @@ function SettingsPage() {
 	const [syncingItemId, setSyncingItemId] = useState<Id<"items"> | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [envChecks, setEnvChecks] = useState<Record<string, boolean> | null>(
+		null,
+	);
 
 	const refreshHealth = useCallback(async () => {
 		setIsLoadingHealth(true);
@@ -150,7 +158,12 @@ function SettingsPage() {
 	useEffect(() => {
 		if (!isLoaded || !isSignedIn) return;
 		void refreshHealth();
-	}, [isLoaded, isSignedIn, refreshHealth]);
+		if (isDev) {
+			void getEnvironmentDiagnostics({})
+				.then((result) => setEnvChecks(result.checks))
+				.catch(() => setEnvChecks(null));
+		}
+	}, [isLoaded, isSignedIn, refreshHealth, getEnvironmentDiagnostics]);
 
 	const handleConnect = async () => {
 		setNotice(null);
@@ -229,6 +242,24 @@ function SettingsPage() {
 				<p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
 					Sign in with Clerk to connect institutions.
 				</p>
+			)}
+
+			{isDev && isSignedIn && envChecks && (
+				<div className="rounded-md border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+					<p className="mb-1 font-semibold text-slate-200">
+						Environment diagnostics (dev-only)
+					</p>
+					<ul className="space-y-1">
+						{Object.entries(envChecks).map(([key, ok]) => (
+							<li key={key} className="flex items-center gap-2">
+								<span className={ok ? "text-emerald-300" : "text-rose-300"}>
+									{ok ? "✓" : "✗"}
+								</span>
+								<span>{key}</span>
+							</li>
+						))}
+					</ul>
+				</div>
 			)}
 
 			{notice && (

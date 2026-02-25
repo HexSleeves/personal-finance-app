@@ -375,3 +375,23 @@ export const listMyConnectionHealth = action({
 		});
 	},
 });
+
+export const getEnvironmentDiagnostics = action({
+	args: {},
+	handler: async (ctx) => {
+		await requireUser(ctx);
+
+		const checks = {
+			PLAID_CLIENT_ID: !!process.env.PLAID_CLIENT_ID,
+			PLAID_SECRET: !!process.env.PLAID_SECRET,
+			TOKEN_ENCRYPTION_KEY: !!process.env.TOKEN_ENCRYPTION_KEY,
+			PLAID_ENV: !!process.env.PLAID_ENV,
+			CLERK_JWT_ISSUER_DOMAIN: !!process.env.CLERK_JWT_ISSUER_DOMAIN,
+		};
+
+		return {
+			checks,
+			allRequiredSet: Object.values(checks).every(Boolean),
+		};
+	},
+});
