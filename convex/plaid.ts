@@ -1,9 +1,137 @@
 import { action } from './_generated/server'
 import { api } from './_generated/api'
+import type { Id } from './_generated/dataModel'
 import { v } from 'convex/values'
 import { CountryCode, Products } from 'plaid'
 import { getPlaidClient } from './plaidClient'
 import { decryptToken, encryptToken } from './security'
+
+type SyncSummary = {
+  addedCount: number
+  modifiedCount: number
+  removedCount: number
+  cursor: string | undefined
+}
+
+type SyncActionContext = {
+  runQuery: (ref: unknown, args: unknown) => Promise<any>
+  runMutation: (ref: unknown, args: unknown) => Promise<any>
+}
+
+async function runTransactionsSyncForItem(
+  ctx: SyncActionContext,
+  itemId: Id<'items'>,
+): Promise<SyncSummary> {
+  const item: {
+    _id: Id<'items'>
+    userId: Id<'users'>
+    encryptedAccessToken: string
+    cursor?: string
+  } | null = await ctx.runQuery(api.plaidPersistence.getItemForSync, { itemId })
+
+  if (!item) {
+    throw new Error('Item not found')
+  }
+
+  const plaid = getPlaidClient()
+  const accessToken = decryptToken(item.encryptedAccessToken)
+
+  const syncRunId: Id<'syncRuns'> = await ctx.runMutation(
+    api.plaidPersistence.createSyncRun,
+    {
+      userId: item.userId,
+      itemId: item._id,
+      cursorBefore: item.cursor,
+    },
+  )
+
+  let cursor: string | undefined = item.cursor
+  let hasMore = true
+  let addedCount = 0
+  let modifiedCount = 0
+  let removedCount = 0
+
+  try {
+    while (hasMore) {
+      const response = await plaid.transactionsSync({
+        access_token: accessToken,
+        cursor,
+        count: 100,
+      })
+
+      const page = response.data
+      cursor = page.next_cursor
+      hasMore = page.has_more
+
+      const added = page.added.map((tx) => ({
+        transactionId: tx.transaction_id,
+        accountId: tx.account_id,
+        pendingTransactionId: tx.pending_transaction_id ?? undefined,
+        amountCents: Math.round(tx.amount * 100),
+        isoCurrencyCode: tx.iso_currency_code ?? 'USD',
+        merchantNameRaw: tx.merchant_name ?? undefined,
+        nameRaw: tx.name,
+        authorizedDate: tx.authorized_date ?? undefined,
+        postedDate: tx.date,
+        pending: tx.pending,
+      }))
+
+      const modified = page.modified.map((tx) => ({
+        transactionId: tx.transaction_id,
+        accountId: tx.account_id,
+        pendingTransactionId: tx.pending_transaction_id ?? undefined,
+        amountCents: Math.round(tx.amount * 100),
+        isoCurrencyCode: tx.iso_currency_code ?? 'USD',
+        merchantNameRaw: tx.merchant_name ?? undefined,
+        nameRaw: tx.name,
+        authorizedDate: tx.authorized_date ?? undefined,
+        postedDate: tx.date,
+        pending: tx.pending,
+      }))
+
+      const removed = page.removed.map((tx) => ({
+        transactionId: tx.transaction_id,
+      }))
+
+      addedCount += added.length
+      modifiedCount += modified.length
+      removedCount += removed.length
+
+      await ctx.runMutation(api.plaidPersistence.applyTransactionsSyncPage, {
+        userId: item.userId,
+        itemId: item._id,
+        added,
+        modified,
+        removed,
+      })
+    }
+
+    await ctx.runMutation(api.plaidPersistence.finalizeSyncRun, {
+      syncRunId,
+      itemId: item._id,
+      status: 'success',
+      cursorAfter: cursor,
+      addedCount,
+      modifiedCount,
+      removedCount,
+    })
+
+    return { addedCount, modifiedCount, removedCount, cursor }
+  } catch (error) {
+    await ctx.runMutation(api.plaidPersistence.finalizeSyncRun, {
+      syncRunId,
+      itemId: item._id,
+      status: 'failed',
+      cursorAfter: cursor,
+      addedCount,
+      modifiedCount,
+      removedCount,
+      errorMessage: error instanceof Error ? error.message : 'Unknown sync error',
+    })
+
+    throw error
+  }
+}
 
 export const createLinkToken = action({
   args: {
@@ -42,7 +170,7 @@ export const exchangePublicTokenAndSync = action({
       public_token: args.publicToken,
     })
 
-    const itemId = exchange.data.item_id
+    const plaidItemId = exchange.data.item_id
     const accessToken = exchange.data.access_token
 
     const itemInfo = await plaid.itemGet({ access_token: accessToken })
@@ -57,11 +185,11 @@ export const exchangePublicTokenAndSync = action({
       options: { include_optional_metadata: true },
     })
 
-    const itemDocId = await ctx.runMutation(
+    const itemDocId: Id<'items'> = await ctx.runMutation(
       api.plaidPersistence.upsertItemWithInstitution,
       {
         userId: args.userId,
-        plaidItemId: itemId,
+        plaidItemId,
         plaidInstitutionId: institutionId,
         institutionName: institution.data.institution.name,
         institutionLogoUrl: institution.data.institution.logo ?? undefined,
@@ -90,117 +218,15 @@ export const exchangePublicTokenAndSync = action({
       })),
     })
 
-    await ctx.runAction(api.plaid.runTransactionsSync, {
-      itemId: itemDocId,
-    })
+    const syncSummary = await runTransactionsSyncForItem(ctx, itemDocId)
 
-    return { itemId: itemDocId }
+    return { itemId: itemDocId, syncSummary }
   },
 })
 
 export const runTransactionsSync = action({
   args: { itemId: v.id('items') },
-  handler: async (ctx, args) => {
-    const item = await ctx.runQuery(api.plaidPersistence.getItemForSync, {
-      itemId: args.itemId,
-    })
-    if (!item) {
-      throw new Error('Item not found')
-    }
-
-    const plaid = getPlaidClient()
-    const accessToken = decryptToken(item.encryptedAccessToken)
-
-    const syncRunId = await ctx.runMutation(api.plaidPersistence.createSyncRun, {
-      userId: item.userId,
-      itemId: item._id,
-      cursorBefore: item.cursor,
-    })
-
-    let cursor = item.cursor
-    let hasMore = true
-    let addedCount = 0
-    let modifiedCount = 0
-    let removedCount = 0
-
-    try {
-      while (hasMore) {
-        const response = await plaid.transactionsSync({
-          access_token: accessToken,
-          cursor,
-          count: 100,
-        })
-
-        const page = response.data
-        cursor = page.next_cursor
-        hasMore = page.has_more
-
-        const added = page.added.map((tx) => ({
-          transactionId: tx.transaction_id,
-          accountId: tx.account_id,
-          pendingTransactionId: tx.pending_transaction_id ?? undefined,
-          amountCents: Math.round(tx.amount * 100),
-          isoCurrencyCode: tx.iso_currency_code ?? 'USD',
-          merchantNameRaw: tx.merchant_name ?? undefined,
-          nameRaw: tx.name,
-          authorizedDate: tx.authorized_date ?? undefined,
-          postedDate: tx.date,
-          pending: tx.pending,
-        }))
-
-        const modified = page.modified.map((tx) => ({
-          transactionId: tx.transaction_id,
-          accountId: tx.account_id,
-          pendingTransactionId: tx.pending_transaction_id ?? undefined,
-          amountCents: Math.round(tx.amount * 100),
-          isoCurrencyCode: tx.iso_currency_code ?? 'USD',
-          merchantNameRaw: tx.merchant_name ?? undefined,
-          nameRaw: tx.name,
-          authorizedDate: tx.authorized_date ?? undefined,
-          postedDate: tx.date,
-          pending: tx.pending,
-        }))
-
-        const removed = page.removed.map((tx) => ({
-          transactionId: tx.transaction_id,
-        }))
-
-        addedCount += added.length
-        modifiedCount += modified.length
-        removedCount += removed.length
-
-        await ctx.runMutation(api.plaidPersistence.applyTransactionsSyncPage, {
-          userId: item.userId,
-          itemId: item._id,
-          added,
-          modified,
-          removed,
-        })
-      }
-
-      await ctx.runMutation(api.plaidPersistence.finalizeSyncRun, {
-        syncRunId,
-        itemId: item._id,
-        status: 'success',
-        cursorAfter: cursor,
-        addedCount,
-        modifiedCount,
-        removedCount,
-      })
-
-      return { addedCount, modifiedCount, removedCount, cursor }
-    } catch (error) {
-      await ctx.runMutation(api.plaidPersistence.finalizeSyncRun, {
-        syncRunId,
-        itemId: item._id,
-        status: 'failed',
-        cursorAfter: cursor,
-        addedCount,
-        modifiedCount,
-        removedCount,
-        errorMessage: error instanceof Error ? error.message : 'Unknown sync error',
-      })
-      throw error
-    }
+  handler: async (ctx, args): Promise<SyncSummary> => {
+    return await runTransactionsSyncForItem(ctx, args.itemId)
   },
 })
