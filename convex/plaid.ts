@@ -5,7 +5,7 @@ import { CountryCode, Products } from "plaid";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { requireUser } from "./auth";
 import { getPlaidClient } from "./plaidClient";
 import { decryptTokenWithMetadata, encryptToken } from "./security";
@@ -154,7 +154,7 @@ async function runTransactionsSyncForItem(
 		if (typeof retryDelayMs === "number") {
 			await ctx.scheduler.runAfter(
 				retryDelayMs,
-				api.plaid.runTransactionsSync,
+				internal.plaid.runTransactionsSyncInternal,
 				{
 					itemId: item._id,
 				},
@@ -275,6 +275,21 @@ export const exchangePublicTokenAndSync = action({
 export const runTransactionsSync = action({
 	args: { itemId: v.id("items") },
 	handler: async (ctx, args): Promise<SyncSummary> => {
+		const user = await requireUser(ctx);
+		const item = await ctx.runQuery(api.plaidPersistence.getItemForSync, {
+			itemId: args.itemId,
+		});
+		if (!item || item.userId !== user._id) {
+			throw new Error("Item not found");
+		}
+
+		return await runTransactionsSyncForItem(ctx, args.itemId);
+	},
+});
+
+export const runTransactionsSyncInternal = internalAction({
+	args: { itemId: v.id("items") },
+	handler: async (ctx, args): Promise<SyncSummary> => {
 		return await runTransactionsSyncForItem(ctx, args.itemId);
 	},
 });
@@ -350,6 +365,7 @@ export const listMyConnectionHealth = action({
 			lastWebhookAt?: number;
 			updatedAt: number;
 			nextRetryAt?: number;
+			lastSuccessfulSyncAt?: number;
 			institutionName: string;
 		}>
 	> => {

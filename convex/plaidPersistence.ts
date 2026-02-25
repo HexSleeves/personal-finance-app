@@ -438,11 +438,20 @@ export const listItemsByUser = internalQuery({
 			lastWebhookAt?: number;
 			updatedAt: number;
 			nextRetryAt?: number;
+			lastSuccessfulSyncAt?: number;
 			institutionName: string;
 		}> = [];
 
 		for (const item of items) {
-			const institution = await ctx.db.get(item.institutionId);
+			const [institution, latestSuccessfulRun] = await Promise.all([
+				ctx.db.get(item.institutionId),
+				ctx.db
+					.query("syncRuns")
+					.withIndex("by_item_id", (q) => q.eq("itemId", item._id))
+					.filter((q) => q.eq(q.field("status"), "success"))
+					.order("desc")
+					.first(),
+			]);
 			result.push({
 				_id: item._id,
 				plaidItemId: item.plaidItemId,
@@ -452,6 +461,7 @@ export const listItemsByUser = internalQuery({
 				lastWebhookAt: item.lastWebhookAt,
 				updatedAt: item.updatedAt,
 				nextRetryAt: item.nextRetryAt,
+				lastSuccessfulSyncAt: latestSuccessfulRun?.finishedAt,
 				institutionName: institution?.name ?? "Unknown institution",
 			});
 		}

@@ -1,8 +1,18 @@
 import { ClerkProvider, useAuth } from "@clerk/clerk-react";
-import { ConvexReactClient, useMutation } from "convex/react";
+import { ConvexProvider, ConvexReactClient, useMutation } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
 import { api } from "../../convex/_generated/api";
+
+type AppAuthState = {
+	isLoaded: boolean;
+	isSignedIn: boolean;
+};
+
+const AppAuthContext = createContext<AppAuthState>({
+	isLoaded: false,
+	isSignedIn: false,
+});
 
 function createConvexClient(url: string) {
 	return new ConvexReactClient(url);
@@ -29,21 +39,50 @@ function BootstrapCurrentUser() {
 	return null;
 }
 
+function ClerkAuthStateProvider({ children }: { children: React.ReactNode }) {
+	const { isLoaded, isSignedIn } = useAuth();
+	return (
+		<AppAuthContext.Provider value={{ isLoaded, isSignedIn: !!isSignedIn }}>
+			{children}
+		</AppAuthContext.Provider>
+	);
+}
+
+export function useAppAuth() {
+	return useContext(AppAuthContext);
+}
+
 export function AppProviders({ children }: { children: React.ReactNode }) {
 	const convexUrl = import.meta.env.VITE_CONVEX_URL;
 	const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 	const convexClient = convexUrl ? getConvexClient(convexUrl) : null;
 
-	if (!convexClient || !clerkPublishableKey) {
-		return <>{children}</>;
+	if (!convexClient) {
+		return (
+			<AppAuthContext.Provider value={{ isLoaded: true, isSignedIn: false }}>
+				{children}
+			</AppAuthContext.Provider>
+		);
+	}
+
+	if (!clerkPublishableKey) {
+		return (
+			<ConvexProvider client={convexClient}>
+				<AppAuthContext.Provider value={{ isLoaded: true, isSignedIn: false }}>
+					{children}
+				</AppAuthContext.Provider>
+			</ConvexProvider>
+		);
 	}
 
 	return (
 		<ClerkProvider publishableKey={clerkPublishableKey}>
-			<ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
-				<BootstrapCurrentUser />
-				{children}
-			</ConvexProviderWithClerk>
+			<ClerkAuthStateProvider>
+				<ConvexProviderWithClerk client={convexClient} useAuth={useAuth}>
+					<BootstrapCurrentUser />
+					{children}
+				</ConvexProviderWithClerk>
+			</ClerkAuthStateProvider>
 		</ClerkProvider>
 	);
 }

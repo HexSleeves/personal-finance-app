@@ -129,35 +129,49 @@ This is the execution tasklist for the next agent. Follow in order unless blocke
 
 ### 6) Implement Connect Bank in Settings
 
+**Status**: ✅ Done
+
 **Files**: `src/routes/settings.tsx`, new client hooks/components
 
-- [ ] Add “Connect account” button.
-- [ ] Call Convex `createLinkToken` action.
-- [ ] Launch Plaid Link in browser.
-- [ ] Exchange public token and trigger initial sync.
-- [ ] Show success/failure toast states.
+- [x] Add “Connect account” button.
+- [x] Call Convex `createLinkToken` action.
+- [x] Launch Plaid Link in browser.
+- [x] Exchange public token and trigger initial sync.
+- [x] Show success/failure toast states.
+
+**Implemented**:
+
+- [x] Added Plaid Link browser integration in Settings via script loader + `Plaid.create(...)` flow.
+- [x] Added end-to-end connect handler:
+  - create link token (`api.plaid.createLinkToken`)
+  - launch Plaid Link modal
+  - exchange public token and run initial sync (`api.plaid.exchangePublicTokenAndSync`)
+- [x] Added in-page success/error status messages and disabled/loading button states.
+- [x] Added post-connect health refresh to show new/updated institutions immediately.
 
 **Acceptance**:
 
-- User can connect a sandbox institution and see item/account records created.
+- [x] User can connect a sandbox institution and see item/account records created.
 
 ### 7) Connection health UI
 
-**Status**: 🚧 Started
+**Status**: ✅ Done
 
-- [x] Display institutions/items with status (healthy/degraded/needs_reauth/disconnected). *(backend action scaffolded)*
-- [ ] Show last successful sync time.
-- [ ] Add manual “Sync now” action.
+- [x] Display institutions/items with status (healthy/degraded/needs_reauth/disconnected).
+- [x] Show last successful sync time.
+- [x] Add manual “Sync now” action.
 
-**Implemented so far**:
+**Implemented**:
 
 - [x] Added `listMyConnectionHealth` action in `convex/plaid.ts`.
 - [x] Added `listItemsByUser` internal query in `convex/plaidPersistence.ts`.
-- [x] Added basic Settings page Convex call path (`src/routes/settings.tsx`) to validate end-to-end auth + Convex invocation.
+- [x] Added latest successful sync timestamp lookup (`syncRuns` by item, latest success) and returned `lastSuccessfulSyncAt`.
+- [x] Replaced Settings placeholder with real connection-health list UI, status badges, timestamp fields, refresh control, and per-item “Sync now” action.
+- [x] Added user-facing status/error notices for manual sync and connect operations.
 
 **Acceptance**:
 
-- User can understand connection state and trigger sync manually.
+- [x] User can understand connection state and trigger sync manually.
 
 ---
 

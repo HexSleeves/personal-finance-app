@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { action } from "./_generated/server";
 
 export const processPlaidWebhook = action({
@@ -38,7 +38,7 @@ export const processPlaidWebhook = action({
 			);
 
 			if (item) {
-				await ctx.runAction(api.plaid.runTransactionsSync, {
+				await ctx.runAction(internal.plaid.runTransactionsSyncInternal, {
 					itemId: item._id,
 				});
 			}
