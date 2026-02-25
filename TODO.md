@@ -8,35 +8,39 @@ This is the execution tasklist for the next agent. Follow in order unless blocke
 
 ### 1) Replace token placeholder encryption
 
-**Files**: `convex/security.ts`, maybe `convex/plaid.ts`, docs
+**Status**: ✅ Done
 
-- [ ] Replace current `plain:` fallback with mandatory authenticated encryption.
-- [ ] Use Node `crypto` AES-256-GCM (or equivalent) with random IV per token.
-- [ ] Store payload format versioned (`v2:`), include auth tag.
-- [ ] Require `TOKEN_ENCRYPTION_KEY` at startup for any encrypt/decrypt operation.
-- [ ] Add migration path for existing `plain:` records:
-  - [ ] support temporary read for legacy format
-  - [ ] auto-reencrypt on successful decrypt/write path
-- [ ] Add unit tests for encrypt/decrypt roundtrip and tamper detection.
+**Implemented**:
+
+- [x] Replaced `plain:` fallback with AES-256-GCM authenticated encryption in `convex/security.ts`.
+- [x] Added versioned ciphertext payload format (`v2:<iv>.<ciphertext>.<tag>`).
+- [x] `TOKEN_ENCRYPTION_KEY` is now required and validated as base64-encoded 32-byte key.
+- [x] Legacy read path supported for `plain:` and old `v1:` payloads.
+- [x] Auto-rotation to `v2:` added on item sync path in `convex/plaid.ts` via `rotateItemAccessTokenCiphertext` mutation.
+- [x] Tests added in `convex/security.test.ts` for roundtrip and tamper detection.
 
 **Acceptance**:
 
-- No plaintext token storage path remains.
-- Decryption fails for tampered ciphertext.
+- [x] No plaintext token storage path remains for new writes.
+- [x] Decryption fails for tampered ciphertext.
 
 ### 2) Verify Plaid webhook signatures
 
-**Files**: `convex/http.ts`, possibly new helper `convex/plaidWebhookVerify.ts`
+**Status**: ✅ Done
 
-- [ ] Implement Plaid webhook verification using documented headers/signing approach.
-- [ ] Reject invalid signatures with 401.
-- [ ] Keep idempotency behavior for valid events.
-- [ ] Ensure body is verified as raw text payload before parse.
-- [ ] Add tests/fixtures for valid + invalid signature cases.
+**Implemented**:
+
+- [x] Added verification helper `convex/plaidWebhookVerify.ts` using Plaid `Plaid-Verification` JWT flow + `/webhook_verification_key/get`.
+- [x] Added Node runtime action `convex/webhooksNode.ts` to run verification and dispatch processing.
+- [x] Updated `convex/http.ts` to pass raw body/header into `webhooksNode.verifyAndProcessPlaidWebhook`.
+- [x] Invalid signatures return 401.
+- [x] Valid events keep idempotent persistence/processing behavior in `convex/webhooks.ts` + `convex/plaidPersistence.ts`.
+- [x] Raw text body is used for hash verification prior to parsing.
+- [x] Tests added in `convex/plaidWebhookVerify.test.ts` for valid signature, bad signature, and body hash mismatch.
 
 **Acceptance**:
 
-- Unsigned/invalid webhook payloads do not trigger sync.
+- [x] Unsigned/invalid webhook payloads do not trigger sync.
 
 ### 3) Add resilient retry strategy for sync failures
 
@@ -213,8 +217,10 @@ This is the execution tasklist for the next agent. Follow in order unless blocke
 
 ## Engineering hygiene (run every PR)
 
-- [ ] `npx tsc --noEmit`
-- [ ] `npm run build`
+- [ ] `bun run typecheck`
+- [ ] `bun run build`
+- [ ] `bun run test`
+- [ ] `bun run lint` (Biome)
 - [ ] Add/update tests for any changed domain logic.
 - [ ] Update `README.md` for env vars, setup, and new workflows.
 - [ ] Commit with focused message.
@@ -223,8 +229,8 @@ This is the execution tasklist for the next agent. Follow in order unless blocke
 
 ## Suggested immediate next PR (small + high value)
 
-1. **Security PR**
-   - real token encryption + webhook signature verification.
+1. **Reliability PR (next)**
+   - sync retry metadata + exponential backoff + degraded/needs_reauth states + actionable sync errors.
 2. **Auth PR**
    - Clerk + Convex auth context + remove `userId` args.
 3. **Plaid UX PR**

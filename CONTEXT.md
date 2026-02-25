@@ -45,13 +45,20 @@
   - `convex/plaidPersistence.ts`
   - `convex/webhooks.ts`
   - `convex/http.ts`
+- Security hardening now implemented:
+  - Access token encryption upgraded to AES-256-GCM in `convex/security.ts` with `v2:` payload format.
+  - Legacy `plain:` / `v1:` reads supported temporarily with auto-rotation to `v2:` on sync path.
+  - Plaid webhook signature verification implemented in `convex/plaidWebhookVerify.ts`.
+  - Node runtime webhook verification + dispatch action added in `convex/webhooksNode.ts` and called from `convex/http.ts`.
+- Tests added for security/webhook verification:
+  - `convex/security.test.ts`
+  - `convex/plaidWebhookVerify.test.ts`
 - Typecheck currently passes with Convex-generated types.
 
 ### Important caveats
 
-- `convex/security.ts` currently contains **placeholder token protection**, not production-grade encryption.
-- Plaid webhook signature verification is **not implemented yet**.
 - Auth context is not yet enforced end-to-end (user IDs are still passed to some actions/mutations).
+- Sync retries/backoff and degraded-item handling are not implemented yet.
 
 ## Operational notes
 
@@ -64,11 +71,15 @@
 
 - Example env vars in `.env.example`
 - Convex codegen requires running:
-  - `npx convex dev`
-- Typical local commands:
-  - `npm run dev`
-  - `npx tsc --noEmit`
-  - `npm run build`
+  - `bun run convex:dev`
+- Bun-first local commands:
+  - `bun install`
+  - `bun run dev`
+  - `bun run typecheck`
+  - `bun run build`
+  - `bun run lint`
+  - `bun run check`
+- Biome config ignores generated and dependency directories (`convex/_generated`, `node_modules`).
 
 ## Git history summary (recent)
 
@@ -80,6 +91,8 @@
 - `fix: break plaid sync action type cycle with extracted helper`
 - `fix: resolve convex action ctx type mismatch in plaid sync helper`
 - `refactor: type plaid sync helper with Convex ActionCtx`
+- `fix(convex): move webhook signature verification to node runtime`
+- `chore: add biome scripts and bun-first workflow`
 
 ## Where to continue
 
