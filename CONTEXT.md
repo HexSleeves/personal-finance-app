@@ -1,6 +1,7 @@
 # CONTEXT.md
 
 ## Project
+
 - **Name**: Northstar Finance (personal-use budgeting app)
 - **Path**: `/home/exedev/personal-finance-app`
 - **Stack**: TanStack Start (React/TS) + Convex + Plaid
@@ -11,6 +12,7 @@
   4. Plaid transaction import/sync (US-only)
 
 ## User decisions already made
+
 - Budget style: **zero-based budgeting**
 - Bills: **reminders yes**, **due date vs paid tracking yes**
 - Storage: **cloud sync**
@@ -20,6 +22,7 @@
 ## Current implementation status
 
 ### Frontend
+
 - App shell with nav routes exists:
   - `/` Dashboard
   - `/budgets`
@@ -32,6 +35,7 @@
 - Domain types: `src/lib/domain.ts`
 
 ### Backend (Convex) — Phase 1 wiring done
+
 - Schema scaffold: `convex/schema.ts`
 - User bootstrap/query:
   - `convex/users.ts`
@@ -44,17 +48,20 @@
 - Typecheck currently passes with Convex-generated types.
 
 ### Important caveats
+
 - `convex/security.ts` currently contains **placeholder token protection**, not production-grade encryption.
 - Plaid webhook signature verification is **not implemented yet**.
 - Auth context is not yet enforced end-to-end (user IDs are still passed to some actions/mutations).
 
 ## Operational notes
+
 - Vite host issue for exe.dev proxy fixed in `vite.config.ts`:
   - `server.allowedHosts = ['noon-disk.exe.xyz']`
 - Public dev URL format:
   - `https://noon-disk.exe.xyz:3000/`
 
 ## Environment setup
+
 - Example env vars in `.env.example`
 - Convex codegen requires running:
   - `npx convex dev`
@@ -64,6 +71,7 @@
   - `npm run build`
 
 ## Git history summary (recent)
+
 - `chore: scaffold TanStack Start app with Convex-first finance MVP plan`
 - `feat: scaffold finance module routes with MVP mock data views`
 - `fix: allow exe.dev proxy host in vite dev server`
@@ -74,5 +82,6 @@
 - `refactor: type plaid sync helper with Convex ActionCtx`
 
 ## Where to continue
+
 - Continue from TODO.md in priority order.
 - First deliverables should be security + auth hardening, then real Plaid connect UI, then transaction workflow.

@@ -41,9 +41,11 @@ That command provisions/links a deployment, writes env values, and generates `co
 ## Convex Setup (next step)
 
 1. Create a Convex project:
+
    ```bash
    npx convex dev
    ```
+
 2. Follow the interactive prompts to authenticate and provision the project.
 3. Add generated deployment variables to your local env.
 4. Keep `npx convex dev` running while implementing backend functions.
@@ -67,6 +69,7 @@ That command provisions/links a deployment, writes env values, and generates `co
 ## Phase 1 Backend Wiring (in progress)
 
 Implemented:
+
 - Convex user bootstrap mutation (`convex/users.ts`)
 - Plaid client factory (`convex/plaidClient.ts`)
 - Link token creation action (`convex/plaid.ts`)
@@ -76,6 +79,7 @@ Implemented:
 - Plaid webhook HTTP endpoint + idempotent event processing (`convex/http.ts`, `convex/webhooks.ts`)
 
 Still required before production use:
+
 - Replace placeholder token encryption in `convex/security.ts` with strong authenticated encryption.
 - Verify Plaid webhook signatures.
 - Add authenticated user context (Clerk integration) and remove direct `userId` input from client calls.

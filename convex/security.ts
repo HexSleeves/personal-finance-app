@@ -1,44 +1,108 @@
-const TOKEN_PREFIX = 'v1:'
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-function getTokenKey() {
-  return process.env.TOKEN_ENCRYPTION_KEY
+const LEGACY_TOKEN_PREFIX = "v1:";
+const TOKEN_PREFIX = "v2:";
+const LEGACY_PLAIN_PREFIX = "plain:";
+const IV_LENGTH_BYTES = 12;
+
+type DecryptTokenResult = {
+	token: string;
+	wasLegacyFormat: boolean;
+};
+
+function getEncryptionKeyMaterial() {
+	const raw = process.env.TOKEN_ENCRYPTION_KEY;
+	if (!raw) {
+		throw new Error("TOKEN_ENCRYPTION_KEY is required");
+	}
+
+	const key = Buffer.from(raw, "base64");
+	if (key.length !== 32) {
+		throw new Error("TOKEN_ENCRYPTION_KEY must be base64-encoded 32-byte key");
+	}
+
+	return { raw, key };
 }
 
-// Phase-1 wiring helper.
-// If TOKEN_ENCRYPTION_KEY is unset, we store a tagged fallback payload for local dev.
-// Replace this with strong encryption in production before importing real accounts.
 export function encryptToken(token: string) {
-  const key = getTokenKey()
-  if (!key) {
-    return `plain:${token}`
-  }
+	const { key } = getEncryptionKeyMaterial();
+	const iv = randomBytes(IV_LENGTH_BYTES);
+	const cipher = createCipheriv("aes-256-gcm", key, iv);
 
-  const raw = `${key}:${token}`
-  return `${TOKEN_PREFIX}${Buffer.from(raw, 'utf8').toString('base64url')}`
+	const encrypted = Buffer.concat([
+		cipher.update(token, "utf8"),
+		cipher.final(),
+	]);
+	const authTag = cipher.getAuthTag();
+
+	return `${TOKEN_PREFIX}${iv.toString("base64url")}.${encrypted.toString(
+		"base64url",
+	)}.${authTag.toString("base64url")}`;
 }
 
-export function decryptToken(payload: string) {
-  if (payload.startsWith('plain:')) {
-    return payload.slice('plain:'.length)
-  }
+function decryptV2(payload: string, key: Buffer) {
+	const [ivEncoded, ciphertextEncoded, authTagEncoded] = payload
+		.slice(TOKEN_PREFIX.length)
+		.split(".");
 
-  if (!payload.startsWith(TOKEN_PREFIX)) {
-    throw new Error('Unsupported token format')
-  }
+	if (!ivEncoded || !ciphertextEncoded || !authTagEncoded) {
+		throw new Error("Invalid token payload format");
+	}
 
-  const key = getTokenKey()
-  if (!key) {
-    throw new Error('TOKEN_ENCRYPTION_KEY required to decrypt token')
-  }
+	const iv = Buffer.from(ivEncoded, "base64url");
+	const ciphertext = Buffer.from(ciphertextEncoded, "base64url");
+	const authTag = Buffer.from(authTagEncoded, "base64url");
 
-  const decoded = Buffer.from(payload.slice(TOKEN_PREFIX.length), 'base64url').toString(
-    'utf8',
-  )
+	const decipher = createDecipheriv("aes-256-gcm", key, iv);
+	decipher.setAuthTag(authTag);
 
-  const prefix = `${key}:`
-  if (!decoded.startsWith(prefix)) {
-    throw new Error('Invalid token key')
-  }
+	return Buffer.concat([
+		decipher.update(ciphertext),
+		decipher.final(),
+	]).toString("utf8");
+}
 
-  return decoded.slice(prefix.length)
+function decryptLegacyV1(payload: string, rawKey: string) {
+	const decoded = Buffer.from(
+		payload.slice(LEGACY_TOKEN_PREFIX.length),
+		"base64url",
+	).toString("utf8");
+
+	const prefix = `${rawKey}:`;
+	if (!decoded.startsWith(prefix)) {
+		throw new Error("Invalid token key");
+	}
+
+	return decoded.slice(prefix.length);
+}
+
+export function decryptToken(payload: string): string {
+	return decryptTokenWithMetadata(payload).token;
+}
+
+export function decryptTokenWithMetadata(payload: string): DecryptTokenResult {
+	const { raw, key } = getEncryptionKeyMaterial();
+
+	if (payload.startsWith(TOKEN_PREFIX)) {
+		return {
+			token: decryptV2(payload, key),
+			wasLegacyFormat: false,
+		};
+	}
+
+	if (payload.startsWith(LEGACY_TOKEN_PREFIX)) {
+		return {
+			token: decryptLegacyV1(payload, raw),
+			wasLegacyFormat: true,
+		};
+	}
+
+	if (payload.startsWith(LEGACY_PLAIN_PREFIX)) {
+		return {
+			token: payload.slice(LEGACY_PLAIN_PREFIX.length),
+			wasLegacyFormat: true,
+		};
+	}
+
+	throw new Error("Unsupported token format");
 }
