@@ -1,3 +1,4 @@
+import { SignInButton, SignOutButton } from "@clerk/clerk-react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import {
 	createRootRoute,
@@ -7,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
-import { AppProviders } from "../lib/providers";
+import { AppProviders, useAppAuth } from "../lib/providers";
 import appCss from "../styles.css?url";
 
 const navItems = [
@@ -48,9 +49,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 										Zero-based budgeting, bills, and insights
 									</p>
 								</div>
-								<span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
-									MVP in progress
-								</span>
+								<div className="flex items-center gap-2">
+									<AuthControls />
+									<span className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
+										MVP in progress
+									</span>
+								</div>
 							</div>
 							<nav className="flex flex-wrap gap-2">
 								{navItems.map((item) => (
@@ -88,5 +92,45 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<Scripts />
 			</body>
 		</html>
+	);
+}
+
+function AuthControls() {
+	const { clerkEnabled, isLoaded, isSignedIn } = useAppAuth();
+
+	if (!clerkEnabled) {
+		return null;
+	}
+
+	if (!isLoaded) {
+		return (
+			<span className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-300">
+				Auth loading…
+			</span>
+		);
+	}
+
+	if (isSignedIn) {
+		return (
+			<SignOutButton>
+				<button
+					type="button"
+					className="rounded-md border border-slate-700 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800"
+				>
+					Sign out
+				</button>
+			</SignOutButton>
+		);
+	}
+
+	return (
+		<SignInButton mode="modal">
+			<button
+				type="button"
+				className="rounded-md bg-cyan-500 px-3 py-1 text-xs font-medium text-slate-950 hover:bg-cyan-400"
+			>
+				Sign in
+			</button>
+		</SignInButton>
 	);
 }

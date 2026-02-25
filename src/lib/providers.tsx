@@ -7,11 +7,13 @@ import { api } from "../../convex/_generated/api";
 type AppAuthState = {
 	isLoaded: boolean;
 	isSignedIn: boolean;
+	clerkEnabled: boolean;
 };
 
 const AppAuthContext = createContext<AppAuthState>({
 	isLoaded: false,
 	isSignedIn: false,
+	clerkEnabled: false,
 });
 
 function createConvexClient(url: string) {
@@ -42,7 +44,9 @@ function BootstrapCurrentUser() {
 function ClerkAuthStateProvider({ children }: { children: React.ReactNode }) {
 	const { isLoaded, isSignedIn } = useAuth();
 	return (
-		<AppAuthContext.Provider value={{ isLoaded, isSignedIn: !!isSignedIn }}>
+		<AppAuthContext.Provider
+			value={{ isLoaded, isSignedIn: !!isSignedIn, clerkEnabled: true }}
+		>
 			{children}
 		</AppAuthContext.Provider>
 	);
@@ -59,7 +63,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
 	if (!convexClient) {
 		return (
-			<AppAuthContext.Provider value={{ isLoaded: true, isSignedIn: false }}>
+			<AppAuthContext.Provider
+				value={{ isLoaded: true, isSignedIn: false, clerkEnabled: false }}
+			>
 				{children}
 			</AppAuthContext.Provider>
 		);
@@ -68,7 +74,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 	if (!clerkPublishableKey) {
 		return (
 			<ConvexProvider client={convexClient}>
-				<AppAuthContext.Provider value={{ isLoaded: true, isSignedIn: false }}>
+				<AppAuthContext.Provider
+					value={{ isLoaded: true, isSignedIn: false, clerkEnabled: false }}
+				>
 					{children}
 				</AppAuthContext.Provider>
 			</ConvexProvider>
