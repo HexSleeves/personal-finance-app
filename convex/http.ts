@@ -19,7 +19,8 @@ http.route({
 			{
 				body,
 				idempotencyKey,
-				plaidVerificationHeader: request.headers.get("Plaid-Verification") ?? undefined,
+				plaidVerificationHeader:
+					request.headers.get("Plaid-Verification") ?? undefined,
 			},
 		);
 

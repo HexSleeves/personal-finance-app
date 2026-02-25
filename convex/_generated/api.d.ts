@@ -19,21 +19,21 @@ import type * as webhooks from "../webhooks.js";
 import type * as webhooksNode from "../webhooksNode.js";
 
 import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
+	ApiFromModules,
+	FilterApi,
+	FunctionReference,
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  http: typeof http;
-  plaid: typeof plaid;
-  plaidClient: typeof plaidClient;
-  plaidPersistence: typeof plaidPersistence;
-  plaidWebhookVerify: typeof plaidWebhookVerify;
-  security: typeof security;
-  users: typeof users;
-  webhooks: typeof webhooks;
-  webhooksNode: typeof webhooksNode;
+	http: typeof http;
+	plaid: typeof plaid;
+	plaidClient: typeof plaidClient;
+	plaidPersistence: typeof plaidPersistence;
+	plaidWebhookVerify: typeof plaidWebhookVerify;
+	security: typeof security;
+	users: typeof users;
+	webhooks: typeof webhooks;
+	webhooksNode: typeof webhooksNode;
 }>;
 
 /**
@@ -45,8 +45,8 @@ declare const fullApi: ApiFromModules<{
  * ```
  */
 export declare const api: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "public">
+	typeof fullApi,
+	FunctionReference<any, "public">
 >;
 
 /**
@@ -58,8 +58,8 @@ export declare const api: FilterApi<
  * ```
  */
 export declare const internal: FilterApi<
-  typeof fullApi,
-  FunctionReference<any, "internal">
+	typeof fullApi,
+	FunctionReference<any, "internal">
 >;
 
 export declare const components: {};
